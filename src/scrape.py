@@ -11,6 +11,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+from database.db import cria_tabelas, novo_anuncio
+
 BASE_URL = 'https://www.wimoveis.com.br/aluguel/apartamentos/df/brasilia/sudoeste'
 
 def get_soup(url):
@@ -86,6 +88,10 @@ def get_anuncios(soup, pagina):
 
 
 if __name__ == "__main__":
+    cria_tabelas()
+    novo_anuncio()
+
+    exit()
     soup = get_soup(BASE_URL)
 
     paginas = soup.find_all('a', class_=lambda value: value and value.startswith('PageItem-sc-'))
