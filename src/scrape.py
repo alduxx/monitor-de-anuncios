@@ -156,6 +156,8 @@ if __name__ == "__main__":
         if result:
             marca_anuncio_notificado(anuncio['id'])
 
+        sleep(random.randint(2, 10))
+
         break
 
     print("SCRAPE: Script Finalizado! ")
