@@ -11,7 +11,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-from database.db import cria_tabelas, novo_anuncio
+from database.db import cria_tabelas, insere_anuncio, busca_anuncios_nao_notificados, marca_anuncio_notificado
+from notifica.telegram import envia_notificacao
 
 BASE_URL = 'https://www.wimoveis.com.br/aluguel/apartamentos/df/brasilia/sudoeste'
 
@@ -20,7 +21,7 @@ def get_soup(url):
     user_agent = ua.random
     print("\n*******************************************")
     print(f"Buscando URL: {url}")
-    print(f"User agent: {user_agent}")
+    #print(f"User agent: {user_agent}")
     chrome_options = Options()
     chrome_options.add_argument(f'user-agent={user_agent}')
     chrome_options.add_argument("--headless")  
@@ -86,30 +87,75 @@ def get_anuncios(soup, pagina):
 
     return lista_anuncios
 
+def grava_anuncios(anuncios):
+    cont_novos = 0
+    for anuncio in anuncios:
+        id = 0
+        try:
+            id = int(anuncio['id'])
+        except Exception as e:
+            print("SCRAPE: não foi possível converter o valor do id desse anuncio")
+            print(e)
+            continue
+
+        desc = anuncio['descricao']
+        url = anuncio['url']
+        endereco = anuncio['endereco']
+
+        preco = 0
+        try:
+            _str = anuncio['preco']
+            _str_limpo = ''.join(filter(str.isdigit, _str))
+            preco = float(_str_limpo)
+        except Exception as e:
+            print("SCRAPE: não foi possível converter o valor do preco desse anuncio")
+            print(e)
+            continue
+        
+        custo_total = preco
+        custos_adicionais = anuncio['custos']
+        img = anuncio['imagem']
+        caracteristicas = anuncio['caracteristicas']
+
+        result = insere_anuncio(id, desc, url, endereco, preco, custo_total, custos_adicionais, img, caracteristicas)
+        if result:
+            cont_novos += 1
+
+    print(f"SCRAPE: {cont_novos} novos anuncios encontrados!")
+
 
 if __name__ == "__main__":
     cria_tabelas()
-    novo_anuncio()
 
-    exit()
     soup = get_soup(BASE_URL)
 
     paginas = soup.find_all('a', class_=lambda value: value and value.startswith('PageItem-sc-'))
     ultima_pagina = get_ultima_pagina(paginas)
 
-    lista = []
-    lista = lista + get_anuncios(soup, 1) # busca os anuncios da primeira pagina
-    """
-    for _ in range(1, ultima_pagina):
+    objs_anuncios = []
+    objs_anuncios = objs_anuncios + get_anuncios(soup, 1) # busca os anuncios da primeira pagina
+    for _ in range(1, ultima_pagina): # loop nas demais paginasjj
         p = _ + 1
         next_url = f"{BASE_URL}/pagina-{p}"
         soup = get_soup(next_url)
         sleep(random.randint(2, 10))
-        lista = lista + get_anuncios(soup, p)
+        objs_anuncios = objs_anuncios + get_anuncios(soup, p)
 
-    """
-    print(len(lista))
-    print("")
-    print(lista[0])
 
-    print("* Script Finalizado *")
+    grava_anuncios(objs_anuncios)
+
+    # TODO: Avisar anuncios que sairam da base?
+    #print(f"SCRAPE: {len(objs_anuncios)} anuncios na base.")
+    #print("") 
+
+    nao_notificados = busca_anuncios_nao_notificados()
+
+    print(f"SCRAPE: anuncios encontrados que serão notificados: {len(nao_notificados)}")
+    for anuncio in nao_notificados:
+        result = envia_notificacao(anuncio)
+        if result:
+            marca_anuncio_notificado(anuncio['id'])
+
+        break
+
+    print("SCRAPE: Script Finalizado! ")

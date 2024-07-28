@@ -19,13 +19,16 @@ def cria_tabelas():
         valor_total REAL,
         custos_adicionais TEXT ,
         imagem TEXT,
-        caracteristicas TEXT
+        caracteristicas TEXT,
+        notificado INTEGER NOT NULL DEFAULT 0
     );
     """)
 
     conn.commit()
 
     conn.close()
+    print("DB: Tabelas OK!")
+
 
 def insere_anuncio(id, desc, url, end, preco, total, custos, img, caracteristicas):
     conn = sqlite3.connect(DB_PATH)
@@ -42,7 +45,8 @@ def insere_anuncio(id, desc, url, end, preco, total, custos, img, caracteristica
         print("DB: Novo Anuncio inserido com sucesso!")
         sucesso = True
     except sqlite3.IntegrityError:
-        print("DB: Anuncio ja existe na base")
+        #print("DB: Anuncio ja existe na base")
+        pass
     except Exception as e:
         print("Um erro ocorreu:", e)
         print("Tipo de erro:", type(e).__name__)
@@ -52,22 +56,28 @@ def insere_anuncio(id, desc, url, end, preco, total, custos, img, caracteristica
 
     return sucesso
 
+ 
+def busca_anuncios_nao_notificados():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
 
-def novo_anuncio():
-    id_imovel = 2
-    descricao_imovel = "Casa com piscina em São Paulo"
-    url_imovel = "http://imoveis.com/casa-com-piscina"
-    endereco_imovel = "Av. Paulista, 100"
-    preco_imovel = 750_000.00
-    custo_total = 1_000_000.00
-    custos_adicionais = "IPTU 200, energia 500"
-    imagem_imovel = "http://imoveis.com/foto-casa.jpg"
-    caracteristicas_imovel = "4 quartos, piscina, garagem para 2 carros"
+    cursor.execute("SELECT * FROM Imovel WHERE notificado = 0")
 
-    result = insere_anuncio(id_imovel, descricao_imovel, url_imovel, endereco_imovel,  preco_imovel, custo_total, custos_adicionais, imagem_imovel, caracteristicas_imovel)
-    print(result)
+    registros = cursor.fetchall()
 
+    cursor.close()
+    conn.close()
 
+    return registros
 
 
+def marca_anuncio_notificado(anuncio_id):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
 
+    cursor.execute(f"UPDATE Imovel SET notificado = 1 WHERE id = {anuncio_id}")
+
+    conn.commit()
+    cursor.close()
+    conn.close()
