@@ -14,7 +14,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from database.db import cria_tabelas, insere_anuncio, busca_anuncios_nao_notificados, marca_anuncio_notificado
 from notifica.telegram import envia_notificacao
 
-BASE_URL = 'https://www.wimoveis.com.br/aluguel/apartamentos/df/brasilia/sudoeste'
+BASE_URL = 'https://www.wimoveis.com.br/aluguel/apartamentos/brasil/desde-2-ate-3-quartos{pag}?loc=C:99994;Z:42750'
 
 def get_soup(url):
     ua = UserAgent()
@@ -127,16 +127,20 @@ def grava_anuncios(anuncios):
 if __name__ == "__main__":
     cria_tabelas()
 
-    soup = get_soup(BASE_URL)
+    url_pri_pag = BASE_URL.replace('{pag}', '') # Na primeira pagina, nao precisa do termo pagina-x
+    soup = get_soup(url_pri_pag) 
 
     paginas = soup.find_all('a', class_=lambda value: value and value.startswith('PageItem-sc-'))
     ultima_pagina = get_ultima_pagina(paginas)
+
+    print(f"Encontradas {ultima_pagina} paginas")
 
     objs_anuncios = []
     objs_anuncios = objs_anuncios + get_anuncios(soup, 1) # busca os anuncios da primeira pagina
     for _ in range(1, ultima_pagina): # loop nas demais paginasjj
         p = _ + 1
-        next_url = f"{BASE_URL}/pagina-{p}"
+        #next_url = f"{BASE_URL}/pagina-{p}"
+        next_url = BASE_URL.replace('{pag}', f'/pagina-{p}')
         soup = get_soup(next_url)
         sleep(random.randint(2, 10))
         objs_anuncios = objs_anuncios + get_anuncios(soup, p)
@@ -145,12 +149,11 @@ if __name__ == "__main__":
     grava_anuncios(objs_anuncios)
 
     # TODO: Avisar anuncios que sairam da base?
-    #print(f"SCRAPE: {len(objs_anuncios)} anuncios na base.")
-    #print("") 
 
     nao_notificados = busca_anuncios_nao_notificados()
 
     print(f"SCRAPE: anuncios encontrados que serão notificados: {len(nao_notificados)}")
+    max = 0
     for anuncio in nao_notificados:
         result = envia_notificacao(anuncio)
         if result:
@@ -158,6 +161,8 @@ if __name__ == "__main__":
 
         sleep(random.randint(2, 10))
 
-        break
+        max += 1
+        if max > 12:
+            break
 
     print("SCRAPE: Script Finalizado! ")
