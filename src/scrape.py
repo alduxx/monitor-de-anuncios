@@ -152,17 +152,21 @@ if __name__ == "__main__":
 
     nao_notificados = busca_anuncios_nao_notificados()
 
-    print(f"SCRAPE: anuncios encontrados que serão notificados: {len(nao_notificados)}")
-    max = 0
-    for anuncio in nao_notificados:
-        result = envia_notificacao(anuncio)
-        if result:
-            marca_anuncio_notificado(anuncio['id'])
+    if len(nao_notificados) > 5:
+        msg = f"SCRAPE: Muitos anúncios encontrados para notificação: {len(nao_notificados)}. Favor avaliar!"
+        print(msg)
+    else:
+        print(f"SCRAPE: anuncios encontrados que serão notificados: {len(nao_notificados)}")
+        max = 0
+        for anuncio in nao_notificados:
+            result = envia_notificacao(anuncio)
+            if result:
+                marca_anuncio_notificado(anuncio['id'])
 
-        sleep(random.randint(2, 10))
+            sleep(random.randint(2, 10))
 
-        max += 1
-        if max > 12:
-            break
+            max += 1
+            if max > 12:
+                break
 
-    print("SCRAPE: Script Finalizado! ")
+        print("SCRAPE: Script Finalizado! ")
