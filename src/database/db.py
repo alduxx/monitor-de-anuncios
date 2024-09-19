@@ -20,6 +20,7 @@ def cria_tabelas():
         custos_adicionais TEXT ,
         imagem TEXT,
         caracteristicas TEXT,
+        data_criacao DATETIME DEFAULT CURRENT_TIMESTAMP,
         notificado INTEGER NOT NULL DEFAULT 0
     );
     """)
