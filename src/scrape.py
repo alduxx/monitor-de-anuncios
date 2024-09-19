@@ -4,6 +4,7 @@ import random
 from fake_useragent import UserAgent
 from bs4 import BeautifulSoup
 from time import sleep
+from datetime import datetime
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -12,19 +13,21 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 from database.db import cria_tabelas, insere_anuncio, busca_anuncios_nao_notificados, marca_anuncio_notificado
-from notifica.telegram import envia_notificacao
+from notifica.telegram import envia_notificacao, envia_notificacao_erro
 
-BASE_URL = 'https://www.wimoveis.com.br/aluguel/apartamentos/brasil/desde-2-ate-3-quartos{pag}?loc=C:99994;Z:42750'
+PRECO_MAX = 3000
+BASE_URL = 'https://www.wimoveis.com.br/aluguel/apartamentos/brasil/desde-2-ate-3-quartos{pag}?loc=C:99994;Z:42750,42705'
 
 def get_soup(url):
     ua = UserAgent()
     user_agent = ua.random
     print("\n*******************************************")
+    print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     print(f"Buscando URL: {url}")
     #print(f"User agent: {user_agent}")
     chrome_options = Options()
     chrome_options.add_argument(f'user-agent={user_agent}')
-    chrome_options.add_argument("--headless")  
+    chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox");
     chrome_options.add_argument("disable-gpu");
 
@@ -43,7 +46,7 @@ def get_ultima_pagina(paginas):
                 ultima_pagina = p
         except:
             pass
-            
+
     return ultima_pagina
 
 
@@ -87,6 +90,7 @@ def get_anuncios(soup, pagina):
 
     return lista_anuncios
 
+
 def grava_anuncios(anuncios):
     cont_novos = 0
     for anuncio in anuncios:
@@ -111,24 +115,30 @@ def grava_anuncios(anuncios):
             print("SCRAPE: não foi possível converter o valor do preco desse anuncio")
             print(e)
             continue
-        
+
         custo_total = preco
         custos_adicionais = anuncio['custos']
         img = anuncio['imagem']
         caracteristicas = anuncio['caracteristicas']
 
-        result = insere_anuncio(id, desc, url, endereco, preco, custo_total, custos_adicionais, img, caracteristicas)
+        if preco > PRECO_MAX:
+            print(f"SCRAPE: preço desse anuncio [{preco}] maior que o preco maximo definido [{PRECO_MAX}]. Nao sera inserido")
+            result = 0
+        else:
+            result = insere_anuncio(id, desc, url, endereco, preco, custo_total, custos_adicionais, img, caracteristicas)
+
         if result:
             cont_novos += 1
 
     print(f"SCRAPE: {cont_novos} novos anuncios encontrados!")
 
 
+
 if __name__ == "__main__":
     cria_tabelas()
 
     url_pri_pag = BASE_URL.replace('{pag}', '') # Na primeira pagina, nao precisa do termo pagina-x
-    soup = get_soup(url_pri_pag) 
+    soup = get_soup(url_pri_pag)
 
     paginas = soup.find_all('a', class_=lambda value: value and value.startswith('PageItem-sc-'))
     ultima_pagina = get_ultima_pagina(paginas)
@@ -154,6 +164,7 @@ if __name__ == "__main__":
 
     if len(nao_notificados) > 5:
         msg = f"SCRAPE: Muitos anúncios encontrados para notificação: {len(nao_notificados)}. Favor avaliar!"
+        result = envia_notificacao_erro(msg)
         print(msg)
     else:
         print(f"SCRAPE: anuncios encontrados que serão notificados: {len(nao_notificados)}")
